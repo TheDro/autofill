@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Autofill",
+  "version": "0.1",
+  "description": "Add AI autocompletion to the web",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {}
+  },
+  "icons": {}
+}
