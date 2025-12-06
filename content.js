@@ -4,6 +4,9 @@ class AITextAutocompleter {
     this.currentTextarea = null;
     this.suggestions = [];
     this.selectedIndex = -1;
+    this.timeoutId = null;
+    this.debounceDelay = 500; // 100ms debounce delay
+    this.inputEventListener = null;
     this.setupEventListeners();
   }
 
@@ -12,6 +15,11 @@ class AITextAutocompleter {
     document.addEventListener('focusin', (e) => {
       if (e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
         this.handleFocus(e.target);
+      }
+    });
+    document.addEventListener('focusout', (e) => {
+      if (e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        this.handleBlur(e.target);
       }
     });
 
@@ -24,31 +32,52 @@ class AITextAutocompleter {
     this.hideSuggestionBox();
     
     // Add input event listener to the active textarea
-    this.currentTextarea.addEventListener('input', this.handleInput.bind(this));
+    this.inputEventListener = this.handleInput.bind(this)
+    this.currentTextarea.addEventListener('input', this.inputEventListener);
+  }
+
+  handleBlur(element) {
+    this.currentTextarea.removeEventListener('input', this.inputEventListener);
+    this.hideSuggestionBox();
+    this.currentTextarea = null;
   }
 
   async handleInput() {
+    // Clear any existing timeout to debounce the input
+    if (this.timeoutId) {
+      console.log(`Clearing timeout ${this.timeoutId}`)
+      clearTimeout(this.timeoutId);
+    }
+
     const text = this.currentTextarea.value || this.currentTextarea.innerText;
     if (!text.trim()) {
       this.hideSuggestionBox();
       return;
     }
 
-    try {
-      // Get suggestions from background script
-      const suggestions = await this.getSuggestions(text);
-      console.log({suggestions})
-      
-      if (suggestions && suggestions.length > 0) {
-        this.suggestions = suggestions;
-        this.showSuggestions(suggestions);
-      } else {
+    // Set a new timeout
+    this.timeoutId = setTimeout(async () => {
+
+      try {
+        // Get suggestions from background script
+        console.log("getting suggestion...")
+        const suggestion_response = await this.getSuggestions(text);
+        suggestion_response.received_message = new Date().toISOString()
+        console.log(suggestion_response)
+        const suggestions = suggestion_response.suggestions;
+
+        if (suggestions && suggestions.length > 0) {
+          this.suggestions = suggestions;
+          this.showSuggestions(suggestions);
+        } else {
+          this.hideSuggestionBox();
+        }
+      } catch (error) {
+        console.error('Error getting suggestions:', error);
         this.hideSuggestionBox();
       }
-    } catch (error) {
-      console.error('Error getting suggestions:', error);
-      this.hideSuggestionBox();
-    }
+    }, this.debounceDelay);
+    console.log(`Set timeout to ${this.timeoutId}`)
   }
 
   async getSuggestions(text) {
@@ -56,8 +85,8 @@ class AITextAutocompleter {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
         { type: 'GET_SUGGESTIONS', text },
-        (response) => {
-          resolve(response?.suggestions || []);
+        (suggestion_response) => {
+          resolve(suggestion_response);
         }
       );
     });

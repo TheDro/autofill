@@ -67,9 +67,6 @@ async function getAICompletion(text, settings) {
     const data = await response.json();
     let result = data.choices.map(choice => choice.message.content.trim())
 
-    console.error(JSON.stringify(result))
-    console.error(JSON.stringify(data))
-    console.log({result})
     return result
   } catch (error) {
     console.error('Error getting AI completion:', error);
@@ -82,15 +79,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {
     try {
       if (request.type === 'GET_SUGGESTIONS') {
+        let response = {}
+        response.start = new Date()
         const settings = await loadSettings();
-        
+        response.loaded_settings = new Date()
+
         if (!settings.enabled) {
-          sendResponse({ suggestions: [] });
+          response.enabled = false
+          response.suggestions = []
+          sendResponse(response);
           return;
         }
-        
-        const suggestions = await getAICompletion(request.text, settings);
-        sendResponse({ suggestions });
+
+        response.suggestions = await getAICompletion(request.text, settings);
+        response.received_suggestions = new Date()
+        sendResponse(response);
       } 
       else if (request.type === 'GET_SETTINGS') {
         const settings = await loadSettings();
