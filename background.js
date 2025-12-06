@@ -26,14 +26,16 @@ async function saveSettings(settings) {
 }
 
 // Get AI completion from OpenAI API
-async function getAICompletion(text, settings) {
+async function getAICompletion(textBefore, textAfter,  settings) {
   if (!settings.apiKey) {
     console.error('No API key provided');
-    return [];
+    return {suggestion: "", message: "No API key provided"};
   }
+  let response = {}
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    response.start_request = new Date()
+    const apiResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -41,36 +43,41 @@ async function getAICompletion(text, settings) {
       },
       body: JSON.stringify({
         // model: settings.model,
-        model: 'gpt-5-nano',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful AI assistant that provides concise text completions.'
-          },
-          {
-            role: 'user',
-            content: `Complete the following text. Only return the completion text, nothing else. Text: "${text}"`
-          }
-        ],
+        model: 'gpt-5-mini',
+        instructions: "You are an auto-complete assistant that concisely completes text. Only return the predicted text inside of the <completion> tag.",
+        input: `<text_before>${textBefore}</text_before><completion></completion><text_after>${textAfter}</text_after>`,
+        reasoning: {effort: "minimal"}
+        // messages: [
+        //   {
+        //     role: 'system',
+        //     content: 'You are a helpful AI assistant that provides concise text completions.'
+        //   },
+        //   {
+        //     role: 'user',
+        //     content: `Complete the following text. Only return the completion text, nothing else. Text: "${text}"`
+        //   }
+        // ],
         // max_completion_tokens: settings.maxTokens,
         // max_completion_tokens: 100,
         // stop: ['\n', '.', '!', '?']
       })
     });
+    response.end_request = new Date()
 
-    if (!response.ok) {
-      const errorData = await response.json();
+    if (!apiResponse.ok) {
+      const errorData = await apiResponse.json();
       console.error('API Error:', JSON.stringify(errorData));
       throw new Error(errorData.error?.message || 'Failed to get AI completion');
     }
 
-    const data = await response.json();
-    let result = data.choices.map(choice => choice.message.content.trim())
-
-    return result
+    const data = await apiResponse.json();
+    let result = data.output[1].content[0].text
+    result = result.replace('<completion>', '').replace('</completion>', '')
+    response.suggestion = result
+    return response
   } catch (error) {
-    console.error('Error getting AI completion:', error);
-    return [];
+    console.error('Error getting AI completion:', error.message);
+    return {suggestion: "", message: error.message};
   }
 }
 
@@ -78,21 +85,15 @@ async function getAICompletion(text, settings) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {
     try {
-      if (request.type === 'GET_SUGGESTIONS') {
-        let response = {}
-        response.start = new Date()
+      if (request.type === 'GET_SUGGESTION') {
         const settings = await loadSettings();
-        response.loaded_settings = new Date()
 
         if (!settings.enabled) {
-          response.enabled = false
-          response.suggestions = []
-          sendResponse(response);
+          sendResponse({suggestion: "", message: "Autocompletion is disabled"});
           return;
         }
 
-        response.suggestions = await getAICompletion(request.text, settings);
-        response.received_suggestions = new Date()
+        let response = await getAICompletion(request.textBefore, request.textAfter || "", settings);
         sendResponse(response);
       } 
       else if (request.type === 'GET_SETTINGS') {

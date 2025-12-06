@@ -59,16 +59,16 @@ class AITextAutocompleter {
     this.timeoutId = setTimeout(async () => {
 
       try {
-        // Get suggestions from background script
+        // Get suggestion from background script
         console.log("getting suggestion...")
-        const suggestion_response = await this.getSuggestions(text);
+        const suggestion_response = await this.getSuggestion(text);
         suggestion_response.received_message = new Date().toISOString()
         console.log(suggestion_response)
-        const suggestions = suggestion_response.suggestions;
+        const suggestion = suggestion_response.suggestion;
 
-        if (suggestions && suggestions.length > 0) {
-          this.suggestions = suggestions;
-          this.showSuggestions(suggestions);
+        if (suggestion && suggestion.length > 0) {
+          this.suggestions = [suggestion];
+          this.showSuggestions(this.suggestions);
         } else {
           this.hideSuggestionBox();
         }
@@ -80,11 +80,16 @@ class AITextAutocompleter {
     console.log(`Set timeout to ${this.timeoutId}`)
   }
 
-  async getSuggestions(text) {
+  async getSuggestion(text) {
     // This will be implemented in the background script
     return new Promise((resolve) => {
+      let cursorPosition = this.currentTextarea.selectionStart
+      let textBefore = text.substring(0, cursorPosition)
+      let textAfter = text.substring(cursorPosition)
+      console.log(`Getting suggestion for ${textBefore} | ${textAfter}`)
+
       chrome.runtime.sendMessage(
-        { type: 'GET_SUGGESTIONS', text },
+        { type: 'GET_SUGGESTION', textBefore, textAfter },
         (suggestion_response) => {
           resolve(suggestion_response);
         }

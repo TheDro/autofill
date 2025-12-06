@@ -1,5 +1,6 @@
+
 const apiKey = "";
-async function runOpenAI(message) {
+async function runOpenAI(text) {
 
   let tic = new Date();
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -9,9 +10,9 @@ async function runOpenAI(message) {
       "Authorization": `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "gpt-5-nano",      // or any other supported chat model
-      instructions: "You are an auto-complete bot that completes text, only return the completion text, nothing else.",
-      input: message,
+      model: "gpt-5-mini",      // or any other supported chat model
+      instructions: "You are an auto-complete assistant that concisely completes text. Only return the predicted text inside of the <completion> tag.",
+      input: `<text_before>${text}</text_before><completion></completion><text_after></text_after>`,
       reasoning: {effort: "minimal"}
     })
   });
@@ -22,4 +23,4 @@ async function runOpenAI(message) {
   console.log(data.output[1].content[0].text)
 }
 
-runOpenAI("Hello, there! Ahhh, gener")
+runOpenAI("- Hello, there!\n- Ahhh, general Ke")
